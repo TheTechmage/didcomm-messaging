@@ -6,15 +6,15 @@ If a message is signed and encrypted to add non-repudiation, it MUST be signed p
 
 #### Algorithms
 
-When a sender would like for a message to feature a non-repudiable digital signature, the JWAs defined below can be used within the structure of a JWS.
+When a sender would like for a message to feature a non-repudiable digital signature, the JWAs defined below can be used within the structure of a JWS for JSON encoding, or the corresponding COSE algorithms within the structure of a `COSE_Sign1` for CBOR encoding.
 
 Implementations MUST be able to verify all of the following algorithms and MUST support signing with at least one.
 
-| Algorithm(JWA)           | Description                                                  |
-| ------------------------ | ------------------------------------------------------------ |
-| EdDSA (with crv=Ed25519) | Elliptic curve digital signature with Edwards curves and SHA-512 |
-| ES256                    | Elliptic curve digital signature with NIST p-256 curve and SHA-256 (deprecated) |
-| ES256K                   | Elliptic curve digital signature with Secp256k1 keys.        |
+| Algorithm(JWA)           | COSE `alg` value | Description                                                  |
+| ------------------------ | ---------------- | ------------------------------------------------------------ |
+| EdDSA (with crv=Ed25519) | `-8`             | Elliptic curve digital signature with Edwards curves and SHA-512 |
+| ES256                    | `-7`             | Elliptic curve digital signature with NIST p-256 curve and SHA-256 (deprecated) |
+| ES256K                   | `-47`            | Elliptic curve digital signature with Secp256k1 keys.        |
 
 #### Construction
 
@@ -31,6 +31,8 @@ The `kid` MUST be a DID URI that refers to a key specified as an authorization k
 The JWS payload (not shown above) is the Base64url encoded JWM.
 
 When transmitted in a normal JWM fashion, the JSON Serialization MUST be used. Either the General or Flattened form of a JWS is valid. Message recipients MUST be able to process both forms. Message senders using signed messages MAY use either form. Flatted form is sufficient, as only the message sender's signature is valid, and a single signature may be fully represented in flattened form.
+
+For CBOR encoding, construct a `COSE_Sign1` ([RFC 9052 §4.2](https://www.rfc-editor.org/rfc/rfc9052#section-4.2)) carrying its CBOR tag (18), with a protected header of `alg` (label 1), `kid` (label 4: the same DID URL, as a UTF-8 byte string) and `typ` (label 16, `application/didcomm-signed+cbor`), an empty unprotected header, the CBOR-encoded plaintext message as the payload, and a signature over the `Sig_structure` with an empty `external_aad`. `COSE_Sign1` is the counterpart of the flattened JWS; `COSE_Sign` is not used, since only the message sender's signature is valid.
 
 #### Verification
 
@@ -52,7 +54,7 @@ DIDComm Messaging is based on [DIDs](https://www.w3.org/TR/did-core/) and their 
 
 A DID is rotated by sending a message of any type to the recipient to be notified of the rotation. The message MUST be encrypted, MUST use the new DID, and MUST include one additional attribute as a message header:
 
-- **from_prior**: REQUIRED. A JWT, with `sub`: new DID and `iss`: prior DID, with a signature from a key authorized by prior DID. Standard [JWT](https://datatracker.ietf.org/doc/html/rfc7519) Practices for creating and signing the JWT MUST be followed.
+- **from_prior**: REQUIRED. A JWT, with `sub`: new DID and `iss`: prior DID, with a signature from a key authorized by prior DID. Standard [JWT](https://datatracker.ietf.org/doc/html/rfc7519) Practices for creating and signing the JWT MUST be followed. The value is the JWT in compact serialization in both encodings; a CBOR-encoded message carries it as a text string, not as a CWT.
 
 Care should be taken when choosing when to rotate from one DID to another. The timing of the rotation may cause some lost messages if messages are arriving rapidly. Coordination must also be made with other agents representing the same DID. Rotating at the very beginning of a relationship or during a quiet period in communication is optimal.
 

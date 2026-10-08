@@ -63,7 +63,7 @@ In response to a `max_receive_bytes` request, a Discover Features _disclose_ mes
 HTTPS transports are an effective way to send a message to another online agent.
 
 - Messages MUST be transported via HTTPS POST.
-- The IANA media type for the POST request MUST be set to the [corresponding media type](#iana-media-types), e.g., `application/didcomm-encrypted+json`.
+- The IANA media type for the POST request MUST be set to the [corresponding media type](#iana-media-types), e.g., `application/didcomm-encrypted+json` or `application/didcomm-encrypted+cbor`.
 - A successful message receipt MUST return a code in the 2xx HTTPS Status Code range. 202 Accepted is recommended. 
 - POST requests are used only for one-way transmission from sender to receiver; responses don't flow back in the web server's HTTP response.
 - HTTPS Redirects SHOULD be followed. Only temporary redirects (307) are acceptable. Permanent endpoint relocation should be managed with a DID Document update.
@@ -76,4 +76,4 @@ Websockets are an efficient way to transmit multiple messages without the overhe
 - The trust of each message MUST be associated with DIDComm encryption or signing, not from the socket connection itself.
 - Websockets are used only for one-way transmission from sender to receiver; responses don't flow back the other way on the socket.
 - Using Secure Websockets (wss://) with TLS 1.2 or greater with a cipher suite providing Perfect Forward Secrecy (PFS) allows a transmission to benefit from PFS that's already available at the transport level.
-- When using STOMP over WebSocket, the `content-type` header is `application/didcomm-encrypted+json` as in the HTTPS message.
+- When using STOMP over WebSocket, the `content-type` header is the message's media type (`application/didcomm-encrypted+json` or `application/didcomm-encrypted+cbor`), as in the HTTPS message.
