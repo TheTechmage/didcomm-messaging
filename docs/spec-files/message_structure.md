@@ -52,7 +52,7 @@ When a message is *both* signed and encrypted, this spec echoes the [JOSE recomm
 
 The [media type](https://tools.ietf.org/html/rfc6838) of a DIDComm signed message MUST be `application/didcomm-signed+json` for JSON encoding or `application/didcomm-signed+cbor` for CBOR encoding.
 
-The media type of the envelope SHOULD be set in the [`typ` property](https://tools.ietf.org/html/rfc7515#section-4.1.9) of the JWS for JSON encoding, or in the equivalent header parameter for COSE Sign1 or COSE Sign for CBOR encoding.
+The media type of the envelope SHOULD be set in the [`typ` property](https://tools.ietf.org/html/rfc7515#section-4.1.9) of the JWS for JSON encoding, or, for CBOR encoding, in the `typ` header parameter (label 16, [RFC 9596](https://www.rfc-editor.org/rfc/rfc9596)) of the `COSE_Sign1` protected header.
 
 In order to avoid [surreptitious forwarding or malicious usage](https://theworld.com/~dtd/sign_encrypt/sign_encrypt7.html) of a signed message, a signed message SHOULD contain a properly defined `to` header. In the case where a message is *both* signed and encrypted, the inner (signed) message being signed MUST contain a `to` header.
 
@@ -62,11 +62,11 @@ When persisted as a file or attached as a payload in other contexts, the file ex
 
 ### DIDComm Encrypted Messages
 
-A **DIDComm encrypted message** is an encrypted message. When using JSON encoding, it is an encrypted [JWM](https://tools.ietf.org/html/draft-looker-jwm-01) using JWE. When using CBOR encoding, it uses COSE Encrypt or COSE Encrypt0. It hides its content from all but authorized recipients, discloses and proves the sender to exactly and only those recipients, and provides integrity guarantees. It is important in privacy-preserving routing. It is what normally moves over network transports in DIDComm Messaging applications, and is the safest format for storing DIDComm Messaging data at rest.
+A **DIDComm encrypted message** is an encrypted message. When using JSON encoding, it is an encrypted [JWM](https://tools.ietf.org/html/draft-looker-jwm-01) using JWE. When using CBOR encoding, it is a `COSE_Encrypt` ([RFC 9052](https://www.rfc-editor.org/rfc/rfc9052)), laid out as described in [Message Encryption](#message-encryption). It hides its content from all but authorized recipients, discloses and proves the sender to exactly and only those recipients, and provides integrity guarantees. It is important in privacy-preserving routing. It is what normally moves over network transports in DIDComm Messaging applications, and is the safest format for storing DIDComm Messaging data at rest.
 
 The [media type](https://tools.ietf.org/html/rfc6838) of a non-nested DIDComm encrypted message MUST be `application/didcomm-encrypted+json` for JSON encoding or `application/didcomm-encrypted+cbor` for CBOR encoding.
 
-The media type of the envelope SHOULD be set in the [`typ` property](https://tools.ietf.org/html/rfc7516#section-4.1.11) of the JWE for JSON encoding, or in the equivalent header parameter for COSE Encrypt or COSE Encrypt0 for CBOR encoding.
+The media type of the envelope SHOULD be set in the [`typ` property](https://tools.ietf.org/html/rfc7516#section-4.1.11) of the JWE for JSON encoding, or, for CBOR encoding, in the `typ` header parameter (label 16, [RFC 9596](https://www.rfc-editor.org/rfc/rfc9596)) of the `COSE_Encrypt` body protected header.
 
 When persisted as a file or attached as a payload in other contexts, the file extension for DIDComm encrypted messages SHOULD be `dcem` for JSON-encoded messages or `dcem-cbor` for CBOR-encoded messages, giving a globbing pattern of `*.dcem` or `*.dcem-cbor`; these SHOULD be read as "Star Dot D C E M" or "Star Dot D C E M dash C B O R" files. A possible icon for the JSON format depicts an envelope with binary overlay, protected by a lock ([svg](../collateral/dcem.svg) | [256x256](../collateral/dcem-256.png) | [128x128](../collateral/dcem-128.png) | [64x64](../collateral/dcem-64.png)):
 
@@ -80,7 +80,7 @@ A plaintext message has an outermost attribute, `type`, that identifies the *app
 
 A plaintext message also includes attributes and data specific to its message type. These are contained within its `body` attribute.
 
-Prior to being sent, plaintext is usually encrypted into a JWE according to the [JWM](https://tools.ietf.org/html/draft-looker-jwm-01) specification when using JSON encoding, or into a COSE Encrypt or COSE Encrypt0 structure when using CBOR encoding.
+Prior to being sent, plaintext is usually encrypted into a JWE according to the [JWM](https://tools.ietf.org/html/draft-looker-jwm-01) specification when using JSON encoding, or into a `COSE_Encrypt` structure when using CBOR encoding.
 
 The following example shows common elements of a DIDComm plaintext message.
 
@@ -99,16 +99,16 @@ The following example shows common elements of a DIDComm plaintext message.
 }
 ```
 
-The equivalent CBOR encoding would represent the same data structure but in the more compact CBOR binary format. The CBOR map would use the same keys and value types as the JSON structure.
+The equivalent CBOR encoding represents the same data structure in the more compact CBOR binary format: a CBOR map with the same keys (as text strings) and the same value types as the JSON structure, with one addition. CBOR has a native byte string where JSON does not, and a CBOR-encoded message MAY use it for the content of an [attachment](#attachments), in the `binary` field of the attachment's `data`. No other byte strings are permitted in a CBOR-encoded plaintext message, so that every message converts losslessly between the two encodings.
 
 ## Encoding Detection
-As messages may be both JSON or CBOR encoded. The encoding of the message can be determined by inspection of the first byte as follows:
+As messages may be either JSON or CBOR encoded, the encoding of a message is determined by inspection of its first byte, as follows:
 
-JSON messages MUST begin with a first byte of `0x7B` ASCII `{`.
+JSON messages MUST begin with a first byte of `0x7B` (ASCII `{`): the opening brace of the outermost object, with no leading whitespace and no byte order mark.
 
-CBOR messages MUST begin with a first byte value between `0x80` and `0xFF`.
+CBOR messages MUST begin with a first byte value between `0x80` and `0xFF`. Every CBOR-encoded DIDComm message is a map (a plaintext message), a tagged `COSE_Sign1` or a tagged `COSE_Encrypt`, all of which begin with a byte in this range.
 
-Other first byte values are not valid at this time.
+Other first byte values are not valid at this time; a message beginning with any other byte MUST be rejected rather than parsed as either encoding.
 
 ### Message Headers
 
@@ -191,6 +191,7 @@ Each attachment is described with an instance of a JSON object that has the foll
     * `hash` - OPTIONAL. The hash of the content encoded in multi-hash format. Used as an integrity check for the attachment, and MUST be used if the data is referenced via the `links` data attribute.
     * `links` - OPTIONAL. A list of zero or more locations at which the content may be fetched. This allows content to be attached by reference instead of by value.
     * `base64` - OPTIONAL. [Base64url](https://tools.ietf.org/html/rfc4648#section-5)-encoded data, when representing arbitrary content inline instead of via `links`.
+    * `binary` - OPTIONAL, CBOR encoding only. A CBOR byte string holding arbitrary content inline instead of via `links`: the CBOR counterpart of `base64`, carrying the same bytes without the base64url expansion. In a CBOR-encoded message, content that a JSON-encoded message would carry in `base64` SHOULD be carried in `binary` instead. `binary` MUST NOT appear in a JSON-encoded message, and `base64` and `binary` MUST NOT both appear in the same attachment. An implementation that re-encodes a message from one encoding to the other converts between the two fields. Any content may use it, including DIDComm messages being [forwarded](#routing-protocol-20) and media such as images; `media_type` describes the content, and the field only describes how it is represented.
     * `json` - OPTIONAL. Directly embedded JSON data, when representing content inline instead of via `links`, and when the content is natively conveyable as JSON.
 - `byte_count` - OPTIONAL. mostly relevant when content is included by reference instead of by value. Lets the receiver guess how expensive it will be, in time, bandwidth, and storage, to fully fetch the attachment.
 
@@ -231,11 +232,21 @@ Each attachment is described with an instance of a JSON object that has the foll
     {
       "id": "x",
       "description": "example encrypted DIDComm message as attachment",
-      "media_type": "application/didcomm-encrypted+json", // or "application/didcomm-encrypted+cbor" for CBOR encoding
+      "media_type": "application/didcomm-encrypted+json",
       "data": {
         "json": {
           //jwe json structure
         }
+      }
+    },
+    {
+      "id": "y",
+      "description": "example CBOR-encoded encrypted DIDComm message as attachment",
+      "media_type": "application/didcomm-encrypted+cbor",
+      "data": {
+        // in a JSON-encoded message, the COSE_Encrypt bytes base64url-encoded;
+        // in a CBOR-encoded message, the same bytes as a byte string in "binary" instead
+        "base64": "<base64url of the COSE_Encrypt>"
       }
     }
   ]
